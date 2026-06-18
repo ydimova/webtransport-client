@@ -19,32 +19,29 @@
                 await transport.ready;
                 console.log("> [2] WebTransport Session Established");
 
-                // 1. Open the bidirectional stream object
                 const stream = await transport.createBidirectionalStream();
-                
-                // FIX: Access the .writable and .readable properties directly from the stream object
                 const writer = stream.writable.getWriter();
                 const reader = stream.readable.getReader();
 
-                // 2. Prepare and encode payload
                 const data = "user_auth=" + (document.cookie || "SESSION_EXPIRED_OR_EMPTY");
                 const encoded = new TextEncoder().encode(data);
                 
-                // 3. Send the data to the server
+                // 1. Send the payload down the stream
                 await writer.write(encoded);
-                await writer.close(); 
                 console.log("> [3] Data transmitted. Waiting for server echo...");
 
-                // 4. Read the incoming IP acknowledgment from the server
+                // 2. Read the response FIRST before closing out the writing pipeline
                 const { value, done } = await reader.read();
                 if (value) {
                     const decodedResponse = new TextDecoder().decode(value);
                     console.log(`> [SERVER ACK] ${decodedResponse}`);
                     
-                    // Parse out the IP from the server's custom text string
                     const serverIp = decodedResponse.replace("ACK_IP:", "");
                     document.getElementById('ip-display').innerText = serverIp;
                 }
+                
+                // 3. Clean up the tracks safely now that the conversation is over
+                await writer.close(); 
                 
             } catch (e) {
                 console.error("WebTransport Error:", e);
