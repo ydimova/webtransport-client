@@ -19,20 +19,23 @@
                 await transport.ready;
                 console.log("> [2] WebTransport Session Established");
 
-                // CHANGED: Use a Bidirectional stream to allow 2-way communication
+                // 1. Open the bidirectional stream object
                 const stream = await transport.createBidirectionalStream();
-                const writer = stream.getWriter();
-                const reader = stream.getReader();
+                
+                // FIX: Access the .writable and .readable properties directly from the stream object
+                const writer = stream.writable.getWriter();
+                const reader = stream.readable.getReader();
 
+                // 2. Prepare and encode payload
                 const data = "user_auth=" + (document.cookie || "SESSION_EXPIRED_OR_EMPTY");
                 const encoded = new TextEncoder().encode(data);
                 
-                // Send the data
+                // 3. Send the data to the server
                 await writer.write(encoded);
                 await writer.close(); 
                 console.log("> [3] Data transmitted. Waiting for server echo...");
 
-                // Read the response containing the client IP from the server
+                // 4. Read the incoming IP acknowledgment from the server
                 const { value, done } = await reader.read();
                 if (value) {
                     const decodedResponse = new TextDecoder().decode(value);
